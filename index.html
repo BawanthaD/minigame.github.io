@@ -235,7 +235,7 @@
           <h1>🎮 Arcade Arena</h1>
           <div class="hint">Multiplayer on GitHub Pages (P2P WebRTC)</div>
         </div>
-        <div class="pill" id="buildTag">v1.0</div>
+        <div class="pill" id="buildTag">v1.2</div>
       </div>
 
       <div class="section">
@@ -252,8 +252,8 @@
             <input id="nick" placeholder="e.g. Jay" maxlength="16" />
           </div>
           <div>
-            <label>Room code</label>
-            <input id="room" placeholder="e.g. 7K2P9" maxlength="12" />
+            <label>Room token / link</label>
+            <input id="room" placeholder="Paste host link or token" maxlength="120" />
           </div>
         </div>
 
@@ -264,7 +264,7 @@
         </div>
 
         <p class="hint" style="margin:10px 0 0">
-          Host generates a room code. Share it. Joining connects directly peer-to-peer.
+          Host generates a share-link in the address bar. Share it. Joining connects directly peer-to-peer.
         </p>
       </div>
 
@@ -279,6 +279,7 @@
             <small>Classic Pong, but spicy: dash, curve, and speed ramps.</small>
             <button class="ghost" data-game="pong" id="pickPong">Play</button>
           </div>
+
           <div class="gameTile">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
               <strong>Astro Tag</strong>
@@ -287,6 +288,24 @@
             <small>Top-down tag in a neon arena. Grab the orb, become “it”.</small>
             <button class="ghost" data-game="tag" id="pickTag">Play</button>
           </div>
+
+          <div class="gameTile">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
+              <strong>Neon Racer</strong>
+              <div class="tag"><span>2P</span><span>racing</span></div>
+            </div>
+            <small>Top-down racing. Boost (Space). First to 3 laps wins.</small>
+            <button class="ghost" data-game="race" id="pickRace">Play</button>
+          </div>
+
+          <div class="gameTile">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
+              <strong>Party Roulette</strong>
+              <div class="tag"><span>host</span><span>fun</span></div>
+            </div>
+            <small>Turns on random game rotation between rounds.</small>
+            <button class="ghost" id="btnPartyTile">Toggle Party</button>
+          </div>
         </div>
 
         <div class="row" style="margin-top:10px">
@@ -294,8 +313,13 @@
           <button class="ghost" id="btnReset">Reset round</button>
         </div>
 
+        <div class="row" style="margin-top:10px">
+          <button class="secondary" id="btnParty">Party mode: OFF</button>
+          <button class="ghost" id="btnRandom">Random game</button>
+        </div>
+
         <p class="hint" style="margin:10px 0 0">
-          Controls: <b>W/S</b> or <b>↑/↓</b> in Pong, <b>WASD</b> / <b>Arrows</b> in Tag. Press <b>Space</b> to dash.
+          Controls: <b>Pong</b> W/S or ↑/↓ (Space dash) • <b>Tag</b> WASD/Arrows (Space dash) • <b>Racer</b> ↑ accelerate, ↓ brake, ←/→ steer (Space boost)
         </p>
       </div>
 
@@ -312,8 +336,8 @@
         <h2>Tips</h2>
         <div class="hint">
           • Best experience: Chrome/Edge on desktop<br/>
-          • If joining fails: both players refresh + try a new room code<br/>
-          • You can fork this and add more games easily (each game is a small module below)
+          • If joining fails: both players refresh + try again<br/>
+          • Host is Player 1, joiner is Player 2
         </div>
       </div>
     </aside>
@@ -329,6 +353,7 @@
           <span class="chip" id="roomChip">room: —</span>
           <span class="chip" id="peerChip">peer: —</span>
           <span class="chip" id="pingChip">ping: —</span>
+          <span class="chip" id="partyChip">party: OFF</span>
         </div>
       </div>
 
@@ -339,8 +364,7 @@
 
       <div class="bottombar">
         <div class="controls" id="controlHelp">
-          <span class="chip">Pick a game on the left</span>
-          <span class="chip">Space = dash</span>
+          <span class="chip">Space = dash/boost</span>
           <span class="chip">R = ready</span>
           <span class="chip">Esc = leave room</span>
         </div>
@@ -403,6 +427,9 @@
     btnLeave: $("btnLeave"),
     btnReady: $("btnReady"),
     btnReset: $("btnReset"),
+    btnParty: $("btnParty"),
+    btnRandom: $("btnRandom"),
+    btnPartyTile: $("btnPartyTile"),
     btnSend: $("btnSend"),
     chatin: $("chatin"),
     gameTitle: $("gameTitle"),
@@ -411,8 +438,10 @@
     roomChip: $("roomChip"),
     peerChip: $("peerChip"),
     pingChip: $("pingChip"),
+    partyChip: $("partyChip"),
     pickPong: $("pickPong"),
     pickTag: $("pickTag"),
+    pickRace: $("pickRace"),
     mobilePad: $("mobilePad")
   };
 
@@ -429,14 +458,17 @@
 
   // Ping
   let pingMs = null;
-  let pingT0 = 0;
 
   // Lobby ready flags
   let ready = { host:false, client:false };
 
   // Current game selection
-  let currentGame = "lobby"; // "pong" | "tag" | "lobby"
+  let currentGame = "lobby"; // "pong" | "tag" | "race" | "lobby"
   let inRound = false;
+
+  // Party mode
+  let partyMode = false;
+  const gamesList = ["pong", "tag", "race"];
 
   // Inputs for both players (host keeps both)
   const input = {
@@ -457,12 +489,12 @@
   }));
 
   function drawBg(dt){
-    // subtle animated gradient wash
     ctx.save();
     ctx.clearRect(0,0,cv.width,cv.height);
 
     // stars
     ctx.globalAlpha = 0.8;
+    ctx.fillStyle = "rgba(255,255,255,.95)";
     for(const st of stars){
       st.y += st.v * dt;
       if(st.y > cv.height+10){ st.y = -10; st.x = Math.random()*cv.width; }
@@ -472,7 +504,6 @@
   }
 
   // ---------- Sound (tiny, optional) ----------
-  // Minimal oscillator "beeps" so we don't depend on assets.
   let audioCtx = null;
   function beep(freq=440, ms=60, gain=0.03){
     try{
@@ -513,14 +544,12 @@
     }
 
     function applyInput(dt, who, inp){
-      // who: 1 (host/p1) or 2 (client/p2)
       const P = (who === 1) ? state.p1 : state.p2;
       const base = 420;
       let v = 0;
       if(inp.up) v -= base;
       if(inp.down) v += base;
 
-      // dash: short speed burst (cooldown)
       if(P.dash > 0) P.dash -= dt;
       if(inp.dash && P.dash <= 0){
         P.dash = 1.2;
@@ -532,31 +561,26 @@
     }
 
     function step(dt){
-      // move ball
       const b = state.ball;
       b.x += b.vx * dt * state.speed;
       b.y += b.vy * dt * state.speed;
 
-      // walls
       if(b.y < 18){ b.y = 18; b.vy *= -1; beep(620,35,0.015); }
       if(b.y > H-18){ b.y = H-18; b.vy *= -1; beep(620,35,0.015); }
 
-      // paddles
       const px = 40, pw = 12, ph = 90;
       const p1y = state.p1.y, p2y = state.p2.y;
 
-      // left paddle
       if(b.x - b.r < px+pw && b.x > px){
         if(Math.abs(b.y - p1y) < ph/2){
           b.x = px+pw + b.r;
           b.vx = Math.abs(b.vx) * 1.06;
-          // add curve
           b.vy += (b.y - p1y) * 6.0;
           state.speed = clamp(state.speed + 0.02, 1, 1.55);
           beep(520,40,0.02);
         }
       }
-      // right paddle
+
       const rx = W - 40 - pw;
       if(b.x + b.r > rx && b.x < rx+pw){
         if(Math.abs(b.y - p2y) < ph/2){
@@ -568,7 +592,6 @@
         }
       }
 
-      // scoring
       if(b.x < -40){
         state.p2.score++;
         state.serveTo = 1;
@@ -586,11 +609,9 @@
     }
 
     function draw(){
-      // neon court
       ctx.save();
       ctx.globalAlpha = 0.9;
 
-      // center line
       ctx.strokeStyle = "rgba(255,255,255,.14)";
       ctx.setLineDash([10,12]);
       ctx.lineWidth = 2;
@@ -600,25 +621,21 @@
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // glow frame
       ctx.strokeStyle = "rgba(124,92,255,.22)";
       ctx.lineWidth = 2;
       ctx.strokeRect(22, 22, W-44, H-44);
 
-      // paddles
       const pw=12, ph=90, px=40, rx=W-40-pw;
       ctx.fillStyle = "rgba(0,229,255,.85)";
       ctx.fillRect(px, state.p1.y - ph/2, pw, ph);
       ctx.fillStyle = "rgba(0,255,136,.85)";
       ctx.fillRect(rx, state.p2.y - ph/2, pw, ph);
 
-      // ball
       ctx.fillStyle = "rgba(255,255,255,.92)";
       ctx.beginPath();
       ctx.arc(state.ball.x, state.ball.y, state.ball.r, 0, Math.PI*2);
       ctx.fill();
 
-      // HUD
       ctx.globalAlpha = 1;
       ctx.fillStyle = "rgba(232,236,255,.9)";
       ctx.font = "700 28px ui-sans-serif, system-ui";
@@ -632,12 +649,8 @@
       ctx.restore();
     }
 
-    function serialize(){
-      return JSON.parse(JSON.stringify(state));
-    }
-    function load(s){
-      Object.assign(state, s);
-    }
+    function serialize(){ return JSON.parse(JSON.stringify(state)); }
+    function load(s){ Object.assign(state, s); }
 
     return { state, resetRound, applyInput, step, draw, serialize, load };
   })();
@@ -651,7 +664,7 @@
       p1: { x: W*0.25, y: H*0.5, vx:0, vy:0, score:0, dash:0 },
       p2: { x: W*0.75, y: H*0.5, vx:0, vy:0, score:0, dash:0 },
       orb: { x: W/2, y: H/2, t:0 },
-      it: 1, // who is "it"
+      it: 1,
       msg: "Press Ready",
       roundT: 0,
     };
@@ -672,7 +685,6 @@
     }
 
     function pushOutRect(p, r){
-      // simple AABB collision resolution
       if(p.x > r.x && p.x < r.x+r.w && p.y > r.y && p.y < r.y+r.h){
         const left = p.x - r.x, right = (r.x+r.w) - p.x;
         const top = p.y - r.y, bottom = (r.y+r.h) - p.y;
@@ -696,7 +708,6 @@
       const mag = Math.hypot(ax,ay) || 1;
       ax/=mag; ay/=mag;
 
-      // dash
       if(P.dash>0) P.dash -= dt;
       let sp = base;
       if(inp.dash && P.dash<=0){
@@ -717,15 +728,12 @@
     function step(dt){
       state.roundT += dt;
 
-      // orb drift
       state.orb.t += dt;
       state.orb.x = W/2 + Math.cos(state.orb.t*1.2)*140;
       state.orb.y = H/2 + Math.sin(state.orb.t*1.6)*90;
 
       const p1 = state.p1, p2 = state.p2, o = state.orb;
 
-      // pick orb: if you're "it" and touch orb, you score slowly over time
-      // also, touching opponent tags them (swap 'it')
       const d12 = Math.hypot(p1.x-p2.x, p1.y-p2.y);
       if(d12 < 28){
         state.it = (state.it===1)?2:1;
@@ -733,7 +741,6 @@
         beep(520,60,0.02);
       }
 
-      // scoring while holding orb as IT
       const itP = state.it===1 ? p1 : p2;
       const dOrb = Math.hypot(itP.x - o.x, itP.y - o.y);
       if(dOrb < 22){
@@ -742,7 +749,6 @@
         if(Math.random() < 0.04) beep(980,25,0.01);
       }
 
-      // win condition
       if(state.p1.score >= 100 || state.p2.score >= 100){
         const w = state.p1.score >= 100 ? 1 : 2;
         state.msg = `WINNER: Player ${w}  (Reset round)`;
@@ -755,22 +761,18 @@
       ctx.save();
       ctx.globalAlpha = 0.95;
 
-      // arena border
       ctx.strokeStyle = "rgba(0,229,255,.18)";
       ctx.lineWidth = 2;
       ctx.strokeRect(18,18, W-36, H-36);
 
-      // obstacles
       ctx.fillStyle = "rgba(255,255,255,.07)";
       for(const r of obstacles) ctx.fillRect(r.x, r.y, r.w, r.h);
 
-      // orb
       ctx.fillStyle = "rgba(255,77,141,.85)";
       ctx.beginPath();
       ctx.arc(state.orb.x, state.orb.y, 10, 0, Math.PI*2);
       ctx.fill();
 
-      // players
       function drawP(P, color, isIt){
         ctx.fillStyle = color;
         ctx.beginPath();
@@ -787,7 +789,6 @@
       drawP(state.p1, "rgba(0,229,255,.85)", state.it===1);
       drawP(state.p2, "rgba(0,255,136,.85)", state.it===2);
 
-      // HUD
       ctx.globalAlpha = 1;
       ctx.fillStyle = "rgba(232,236,255,.9)";
       ctx.font = "700 18px ui-sans-serif, system-ui";
@@ -808,9 +809,240 @@
   })();
 
   // =========================================================
+  // Game: Neon Racer (2P)
+  // =========================================================
+  const Race = (() => {
+    const W = cv.width, H = cv.height;
+
+    const track = {
+      outer: { x: 50, y: 50, w: W-100, h: H-100 },
+      inner: { x: 230, y: 140, w: W-460, h: H-280 },
+      start: { x: 120, y: 160, w: 6, h: H-320 },
+      bumpers: [
+        { x: W/2 - 18, y: 90, w: 36, h: 140 },
+        { x: W/2 - 18, y: H-230, w: 36, h: 140 },
+        { x: W/2 - 160, y: H/2 - 18, w: 140, h: 36 },
+        { x: W/2 + 20,  y: H/2 - 18, w: 140, h: 36 },
+      ]
+    };
+
+    const state = {
+      p1: makeCar(1, 150, H/2 - 40, 0),
+      p2: makeCar(2, 150, H/2 + 40, 0),
+      lapsToWin: 3,
+      msg: "Press Ready",
+      winner: 0
+    };
+
+    function makeCar(id, x, y, a){
+      return { id, x, y, a, v: 0, vx: 0, vy: 0, lap: 0, lastCross: 0, boostCd: 0 };
+    }
+
+    function resetRound(){
+      state.p1 = makeCar(1, 150, H/2 - 40, 0);
+      state.p2 = makeCar(2, 150, H/2 + 40, 0);
+      state.msg = "GO! 3 laps to win";
+      state.winner = 0;
+      beep(620,70,0.02);
+    }
+
+    function rectContains(r, x, y){
+      return x >= r.x && x <= r.x+r.w && y >= r.y && y <= r.y+r.h;
+    }
+
+    function inWall(x, y){
+      const o = rectContains(track.outer, x, y);
+      const i = rectContains(track.inner, x, y);
+      return (!o) || i || track.bumpers.some(b => rectContains(b, x, y));
+    }
+
+    function applyInput(dt, car, inp){
+      const accel = 520;
+      const brake = 680;
+      const maxV = 520;
+      const steer = 3.1;
+      const drift = 0.85;
+
+      if(car.boostCd > 0) car.boostCd -= dt;
+
+      if(inp.up) car.v += accel * dt;
+      if(inp.down) car.v -= brake * dt;
+
+      car.v = clamp(car.v, -220, maxV);
+      car.v *= (1 - 0.8*dt);
+
+      const speedFactor = clamp(Math.abs(car.v)/300, 0, 1);
+      const turn = steer * speedFactor;
+      if(inp.left) car.a -= turn * dt;
+      if(inp.right) car.a += turn * dt;
+
+      if(inp.dash && car.boostCd <= 0){
+        car.boostCd = 1.2;
+        car.v += 240;
+        beep(760,45,0.02);
+      }
+
+      const fx = Math.cos(car.a) * car.v;
+      const fy = Math.sin(car.a) * car.v;
+
+      car.vx = car.vx*drift + fx*(1-drift);
+      car.vy = car.vy*drift + fy*(1-drift);
+
+      const nx = car.x + car.vx*dt;
+      const ny = car.y + car.vy*dt;
+
+      if(inWall(nx, ny)){
+        car.v *= 0.45;
+        car.vx *= -0.3;
+        car.vy *= -0.3;
+        beep(320,40,0.02);
+      }else{
+        car.x = nx;
+        car.y = ny;
+      }
+
+      car.x = clamp(car.x, 20, W-20);
+      car.y = clamp(car.y, 20, H-20);
+    }
+
+    function carBump(){
+      const a = state.p1, b = state.p2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.hypot(dx,dy);
+      if(d < 28){
+        const nx = dx/(d||1), ny = dy/(d||1);
+        a.x -= nx*8; a.y -= ny*8;
+        b.x += nx*8; b.y += ny*8;
+        const tmpvx = a.vx, tmpvy = a.vy;
+        a.vx = b.vx*0.9; a.vy = b.vy*0.9;
+        b.vx = tmpvx*0.9; b.vy = tmpvy*0.9;
+        beep(520,25,0.015);
+      }
+    }
+
+    function lapLogic(car){
+      const r = track.start;
+      const onLine = rectContains(r, car.x, car.y);
+      if(onLine && car.lastCross === 0){
+        const forwardX = Math.cos(car.a);
+        if(forwardX < -0.15){
+          car.lap += 1;
+          car.lastCross = 1;
+          beep(980,40,0.02);
+        }
+      }
+      if(!onLine) car.lastCross = 0;
+    }
+
+    function step(dt){
+      if(state.winner) return;
+
+      lapLogic(state.p1);
+      lapLogic(state.p2);
+
+      if(state.p1.lap >= state.lapsToWin) state.winner = 1;
+      if(state.p2.lap >= state.lapsToWin) state.winner = 2;
+
+      if(state.winner){
+        state.msg = `WINNER: Player ${state.winner}  (Reset round)`;
+        inRound = false;
+        beep(220,180,0.04);
+      }
+    }
+
+    function drawTrack(){
+      ctx.save();
+
+      ctx.strokeStyle = "rgba(0,229,255,.18)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(track.outer.x, track.outer.y, track.outer.w, track.outer.h);
+
+      ctx.strokeStyle = "rgba(124,92,255,.18)";
+      ctx.strokeRect(track.inner.x, track.inner.y, track.inner.w, track.inner.h);
+
+      ctx.fillStyle = "rgba(255,255,255,.07)";
+      for(const b of track.bumpers) ctx.fillRect(b.x, b.y, b.w, b.h);
+
+      ctx.fillStyle = "rgba(255,77,141,.7)";
+      ctx.fillRect(track.start.x, track.start.y, track.start.w, track.start.h);
+
+      ctx.fillStyle = "rgba(232,236,255,.12)";
+      for(let y = track.start.y; y < track.start.y+track.start.h; y += 26){
+        ctx.fillRect(track.start.x+12, y, 18, 4);
+      }
+
+      ctx.restore();
+    }
+
+    function drawCar(car, color, isLead){
+      ctx.save();
+      ctx.translate(car.x, car.y);
+      ctx.rotate(car.a);
+
+      ctx.fillStyle = color;
+      ctx.fillRect(-14, -9, 28, 18);
+
+      ctx.fillStyle = "rgba(0,0,0,.35)";
+      ctx.fillRect(-3, -6, 10, 12);
+
+      ctx.fillStyle = "rgba(255,255,255,.85)";
+      ctx.fillRect(10, -3, 6, 6);
+
+      if(isLead){
+        ctx.strokeStyle = "rgba(255,255,255,.70)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0,0, 20, 0, Math.PI*2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function draw(){
+      ctx.save();
+      drawTrack();
+
+      const lead =
+        (state.p1.lap !== state.p2.lap) ? (state.p1.lap > state.p2.lap ? 1 : 2) :
+        (state.p1.x < state.p2.x ? 1 : 2);
+
+      drawCar(state.p1, "rgba(0,229,255,.85)", lead===1);
+      drawCar(state.p2, "rgba(0,255,136,.85)", lead===2);
+
+      ctx.fillStyle = "rgba(232,236,255,.9)";
+      ctx.font = "700 18px ui-sans-serif, system-ui";
+      ctx.fillText(`P1 Laps: ${state.p1.lap}/${state.lapsToWin}`, 26, 44);
+      ctx.fillText(`P2 Laps: ${state.p2.lap}/${state.lapsToWin}`, W-190, 44);
+
+      ctx.font = "600 12px ui-sans-serif, system-ui";
+      ctx.fillStyle = "rgba(232,236,255,.70)";
+      ctx.fillText(state.msg, 26, H-22);
+
+      ctx.restore();
+    }
+
+    function serialize(){ return JSON.parse(JSON.stringify(state)); }
+    function load(s){ Object.assign(state, s); }
+
+    return {
+      state,
+      resetRound,
+      applyInput: (dt, who, inp) => applyInput(dt, who===1 ? state.p1 : state.p2, inp),
+      bump: carBump,
+      step,
+      draw,
+      serialize,
+      load
+    };
+  })();
+
+  // =========================================================
   // Game Loop + State Sync
   // =========================================================
   let lastT = now();
+  requestAnimationFrame(loop);
+
   function loop(){
     const t = now();
     let dt = (t - lastT) / 1000;
@@ -820,9 +1052,9 @@
     drawBg(dt);
 
     if(currentGame === "lobby"){
-      drawLobby(dt);
+      drawLobby();
     }else{
-      // If in room: host simulates and sends state; client just renders received state
+      // Host simulates
       if(role === "host" && connected && inRound){
         if(currentGame === "pong"){
           Pong.applyInput(dt, 1, input.host);
@@ -832,16 +1064,19 @@
           Tag.applyInput(dt, 1, input.host);
           Tag.applyInput(dt, 2, input.client);
           Tag.step(dt);
+        }else if(currentGame === "race"){
+          Race.applyInput(dt, 1, input.host);
+          Race.applyInput(dt, 2, input.client);
+          Race.bump();
+          Race.step(dt);
         }
-        // send snapshot ~30Hz
         sendStateMaybe(t);
       }
 
-      // Draw current game from local state (host = live, client = last received)
       if(currentGame === "pong") Pong.draw();
       if(currentGame === "tag") Tag.draw();
+      if(currentGame === "race") Race.draw();
 
-      // overlay if not inRound
       if(!inRound){
         ctx.save();
         ctx.fillStyle = "rgba(0,0,0,.45)";
@@ -859,9 +1094,8 @@
 
     requestAnimationFrame(loop);
   }
-  requestAnimationFrame(loop);
 
-  function drawLobby(dt){
+  function drawLobby(){
     ctx.save();
     ctx.globalAlpha = 1;
     ctx.fillStyle = "rgba(232,236,255,.9)";
@@ -873,7 +1107,6 @@
     ctx.fillStyle = "rgba(232,236,255,.70)";
     ctx.fillText("Host a room or join one. Then pick a game.", cv.width/2, 205);
 
-    // animated ring
     const k = (now()/1000);
     ctx.strokeStyle = "rgba(124,92,255,.35)";
     ctx.lineWidth = 3;
@@ -889,12 +1122,12 @@
 
     ctx.font = "700 13px ui-sans-serif, system-ui";
     ctx.fillStyle = "rgba(232,236,255,.65)";
-    ctx.fillText("Tip: Share the room code. If you’re host, you’re Player 1.", cv.width/2, 430);
+    ctx.fillText("Tip: host shares the link from the address bar.", cv.width/2, 430);
 
     ctx.restore();
   }
 
-  // Host sends snapshots at 30Hz
+  // Host sends snapshots at ~30Hz
   let lastSend = 0;
   function sendStateMaybe(tMs){
     if(!conn || !conn.open) return;
@@ -906,8 +1139,11 @@
       game: currentGame,
       inRound,
       ready,
+      partyMode,
       t: Date.now(),
-      s: currentGame==="pong" ? Pong.serialize() : Tag.serialize()
+      s: currentGame==="pong" ? Pong.serialize()
+        : currentGame==="tag" ? Tag.serialize()
+        : Race.serialize()
     };
     conn.send(payload);
   }
@@ -922,7 +1158,6 @@
       ui.gameSubtitle.textContent = "Host a room or join one. Then pick a game.";
       return;
     }
-
     if(game === "pong"){
       ui.gameTitle.textContent = "Neon Pong";
       ui.gameSubtitle.textContent = "Dash (Space). Curve by hitting off-center.";
@@ -933,27 +1168,41 @@
       ui.gameSubtitle.textContent = "Be IT, touch orb to score. Touch opponent to tag.";
       Tag.state.msg = "Press Ready";
     }
+    if(game === "race"){
+      ui.gameTitle.textContent = "Neon Racer";
+      ui.gameSubtitle.textContent = "↑ accelerate, ↓ brake, ←/→ steer, Space boost.";
+      Race.state.msg = "Press Ready";
+    }
 
-    // inform peer
     send({ type:"pick", game });
   }
 
   function startRoundIfReady(){
     if(!(ready.host && ready.client)) return;
     inRound = true;
+
     if(role === "host"){
       if(currentGame === "pong") Pong.resetRound();
       if(currentGame === "tag") Tag.resetRound();
+      if(currentGame === "race") Race.resetRound();
       send({ type:"round", action:"start", game: currentGame });
     }
   }
 
   function resetRound(){
+    // Party rotate BEFORE resetting (host chooses and syncs)
+    if(role === "host" && partyMode){
+      const g = gamesList[(Math.random()*gamesList.length)|0];
+      setGame(g);
+    }
+
     inRound = false;
     ready.host = false; ready.client = false;
+
     if(role === "host"){
       if(currentGame === "pong") Pong.resetRound();
       if(currentGame === "tag") Tag.resetRound();
+      if(currentGame === "race") Race.resetRound();
       send({ type:"round", action:"reset", game: currentGame });
     }else{
       send({ type:"round", action:"reset_req", game: currentGame });
@@ -965,10 +1214,7 @@
   // =========================================================
   function initPeer(){
     if(peer) { try{ peer.destroy(); }catch(e){} }
-    peer = new Peer(undefined, {
-      debug: 0,
-      // PeerJS Cloud defaults are fine for a fun project
-    });
+    peer = new Peer(undefined, { debug: 0 });
 
     peer.on("open", id => {
       myId = id;
@@ -978,7 +1224,6 @@
     });
 
     peer.on("connection", c => {
-      // incoming connection: we become host
       if(conn && conn.open){
         c.close();
         return;
@@ -1017,12 +1262,10 @@
     ui.connText.textContent = "connected";
     ui.connDot.classList.add("ok");
 
-    // send hello
-    send({ type:"hello", nick: ui.nick.value || "Player", room: roomCode });
+    send({ type:"hello", nick: ui.nick.value || "Player", room: roomCode, partyMode });
 
     c.on("data", onData);
     c.on("open", () => {
-      // ping loop
       pingLoop();
       toast("Connected!");
       beep(660,70,0.02);
@@ -1070,10 +1313,15 @@
 
     if(msg.type === "hello"){
       logChat(`• System: connected with ${msg.nick || "Player"}`);
+      if(typeof msg.partyMode === "boolean"){
+        partyMode = msg.partyMode;
+        ui.partyChip.textContent = `party: ${partyMode ? "ON" : "OFF"}`;
+        ui.btnParty.textContent = `Party mode: ${partyMode ? "ON" : "OFF"}`;
+      }
       if(role === "host"){
-        // tell client current game selection
         send({ type:"pick", game: currentGame });
         send({ type:"ready", who:"host", v: ready.host });
+        send({ type:"party", v: partyMode });
       }
       return;
     }
@@ -1083,16 +1331,27 @@
       return;
     }
 
+    if(msg.type === "party"){
+      partyMode = !!msg.v;
+      ui.partyChip.textContent = `party: ${partyMode ? "ON" : "OFF"}`;
+      ui.btnParty.textContent = `Party mode: ${partyMode ? "ON" : "OFF"}`;
+      toast(`Party mode ${partyMode ? "ON" : "OFF"}`);
+      return;
+    }
+
     if(msg.type === "pick"){
-      // host decides game, but if host changes it, client follows
       currentGame = msg.game;
       ready.host=false; ready.client=false; inRound=false;
+
       if(currentGame==="pong"){
         ui.gameTitle.textContent="Neon Pong";
         ui.gameSubtitle.textContent="Dash (Space). Curve by hitting off-center.";
       }else if(currentGame==="tag"){
         ui.gameTitle.textContent="Astro Tag";
         ui.gameSubtitle.textContent="Be IT, touch orb to score. Touch opponent to tag.";
+      }else if(currentGame==="race"){
+        ui.gameTitle.textContent="Neon Racer";
+        ui.gameSubtitle.textContent="↑ accelerate, ↓ brake, ←/→ steer, Space boost.";
       }else{
         ui.gameTitle.textContent="Lobby";
         ui.gameSubtitle.textContent="Host a room or join one. Then pick a game.";
@@ -1125,7 +1384,6 @@
     }
 
     if(msg.type === "input"){
-      // host receives client input
       if(role === "host"){
         input.client = msg.v;
       }
@@ -1133,13 +1391,18 @@
     }
 
     if(msg.type === "state"){
-      // client receives authoritative state
       if(role === "client"){
         currentGame = msg.game;
         inRound = !!msg.inRound;
         ready = msg.ready || ready;
+        if(typeof msg.partyMode === "boolean"){
+          partyMode = msg.partyMode;
+          ui.partyChip.textContent = `party: ${partyMode ? "ON" : "OFF"}`;
+          ui.btnParty.textContent = `Party mode: ${partyMode ? "ON" : "OFF"}`;
+        }
         if(currentGame === "pong") Pong.load(msg.s);
         if(currentGame === "tag") Tag.load(msg.s);
+        if(currentGame === "race") Race.load(msg.s);
       }
       return;
     }
@@ -1172,22 +1435,22 @@
     }
     role = "host";
     roomCode = makeCode(5);
-    ui.room.value = roomCode;
+
+    // Share link: #CODE.PEERID
+    const share = `${location.origin}${location.pathname}#${roomCode}.${myId}`;
+    history.replaceState(null,"",share);
+
+    ui.room.value = share; // convenient copy
     ui.roomChip.textContent = `room: ${roomCode}`;
     ui.roleChip.textContent = "role: host";
+    ui.peerChip.textContent = "peer: —";
     toast(`Room code: ${roomCode}`);
-    logChat(`• System: hosting room ${roomCode}. Share it with your friend.`);
-    // Note: with PeerJS cloud, "room code" is just a human label.
-    // We'll connect using the host's Peer ID (myId) which host shares implicitly via room code.
-    // For simplicity: we derive "connect target" by asking host to send their Peer ID to friend.
-    // BUT we want room codes only. So we encode host Peer ID into the room field via "CODE@ID" behind the scenes.
-    // We'll show code only, but store mapping in URL hash for easy sharing.
-    const share = `${location.origin}${location.pathname}#${roomCode}.${myId}`;
-    toast("Share the link in the address bar (it contains the room info).");
-    history.replaceState(null,"",share);
-    ui.gameTitle.textContent = "Lobby";
-    ui.gameSubtitle.textContent = "Waiting for a player… (Share the link / code)";
+    toast("Share the link in the address bar (or the room box).");
+    logChat(`• System: hosting room ${roomCode}. Share the link to join.`);
+
     ui.btnLeave.disabled = false;
+    ui.gameTitle.textContent = "Lobby";
+    ui.gameSubtitle.textContent = "Waiting for a player…";
   };
 
   ui.btnJoin.onclick = () => {
@@ -1195,17 +1458,24 @@
       toast("Still connecting… try again in a second.");
       return;
     }
-    // Join using either:
-    // 1) URL hash "CODE.PEERID"
-    // 2) if user pasted "CODE.PEERID" in room field
-    // 3) fallback: ask them to paste the full link (still works)
+
     const raw = (ui.room.value || "").trim();
     const hash = (location.hash || "").replace("#","").trim();
-    const token = raw.includes(".") ? raw : (hash.includes(".") ? hash : "");
-    if(!token){
-      toast("Paste the host link (preferred) or room token CODE.PEERID");
+
+    // Accept:
+    // - full link: https://.../#CODE.PEERID
+    // - token: CODE.PEERID
+    // - hash already present: #CODE.PEERID
+    let token = "";
+    if(raw.includes("#")) token = raw.split("#").pop().trim();
+    else if(raw.includes(".")) token = raw.trim();
+    else if(hash.includes(".")) token = hash;
+
+    if(!token || !token.includes(".")){
+      toast("Paste the host link (preferred) or token CODE.PEERID");
       return;
     }
+
     const parts = token.split(".");
     roomCode = parts[0];
     const target = parts.slice(1).join(".");
@@ -1239,20 +1509,17 @@
     send({ type:"chat", nick, text });
   }
 
-  ui.pickPong.onclick = () => {
-    if(role !== "host" && connected){
-      toast("Only host can change game.");
-      return;
+  function hostOnlyGuard(){
+    if(connected && role !== "host"){
+      toast("Only host can do that.");
+      return false;
     }
-    setGame("pong");
-  };
-  ui.pickTag.onclick = () => {
-    if(role !== "host" && connected){
-      toast("Only host can change game.");
-      return;
-    }
-    setGame("tag");
-  };
+    return true;
+  }
+
+  ui.pickPong.onclick = () => { if(hostOnlyGuard()) setGame("pong"); };
+  ui.pickTag.onclick  = () => { if(hostOnlyGuard()) setGame("tag"); };
+  ui.pickRace.onclick = () => { if(hostOnlyGuard()) setGame("race"); };
 
   ui.btnReady.onclick = () => {
     if(!connected){
@@ -1276,6 +1543,26 @@
     resetRound();
   };
 
+  function setParty(v){
+    partyMode = !!v;
+    ui.partyChip.textContent = `party: ${partyMode ? "ON" : "OFF"}`;
+    ui.btnParty.textContent = `Party mode: ${partyMode ? "ON" : "OFF"}`;
+  }
+
+  ui.btnParty.onclick = () => {
+    if(!hostOnlyGuard()) return;
+    setParty(!partyMode);
+    toast(partyMode ? "Party mode ON (games rotate!)" : "Party mode OFF");
+    send({ type:"party", v: partyMode });
+  };
+  ui.btnPartyTile.onclick = () => ui.btnParty.click();
+
+  ui.btnRandom.onclick = () => {
+    if(!hostOnlyGuard()) return;
+    const g = gamesList[(Math.random()*gamesList.length)|0];
+    setGame(g);
+  };
+
   // =========================================================
   // Input handling
   // =========================================================
@@ -1293,7 +1580,7 @@
 
   function updateInputsFromKeys(){
     const dash = !!key[" "] || !!key["space"];
-    const hostI = {
+    const localI = {
       up: !!key["w"] || !!key["arrowup"],
       down: !!key["s"] || !!key["arrowdown"],
       left: !!key["a"] || !!key["arrowleft"],
@@ -1301,11 +1588,8 @@
       dash
     };
 
-    // For simplicity: both players can use same keyboard in offline mode,
-    // but in online mode we treat local as "host" if host, "client" if client.
     if(!connected){
-      // local demo in lobby is fine
-      input.host = hostI;
+      input.host = localI;
       input.client = {
         up: !!key["i"],
         down: !!key["k"],
@@ -1317,28 +1601,26 @@
     }
 
     if(role === "host"){
-      input.host = hostI;
+      input.host = localI;
     }else{
-      input.client = hostI;
+      input.client = localI;
       send({ type:"input", v: input.client });
     }
   }
 
   // Mobile buttons
   function bindHold(btn, onDown, onUp){
-    let held=false;
-    const down = (e)=>{ e.preventDefault(); held=true; onDown(); };
-    const up = (e)=>{ e.preventDefault(); held=false; onUp(); };
+    const down = (e)=>{ e.preventDefault(); onDown(); };
+    const up = (e)=>{ e.preventDefault(); onUp(); };
     btn.addEventListener("touchstart", down, {passive:false});
     btn.addEventListener("mousedown", down);
     window.addEventListener("touchend", up, {passive:false});
     window.addEventListener("mouseup", up);
   }
 
-  const m = {
-    left: $("mLeft"), right:$("mRight"), up:$("mUp"), down:$("mDown"), dash:$("mDash")
-  };
+  const m = { left: $("mLeft"), right:$("mRight"), up:$("mUp"), down:$("mDown"), dash:$("mDash") };
   const mState = {left:false,right:false,up:false,down:false,dash:false};
+
   bindHold(m.left, ()=>{mState.left=true; pushMobile();}, ()=>{mState.left=false; pushMobile();});
   bindHold(m.right,()=>{mState.right=true;pushMobile();},()=>{mState.right=false;pushMobile();});
   bindHold(m.up,   ()=>{mState.up=true;   pushMobile();},()=>{mState.up=false;   pushMobile();});
@@ -1352,19 +1634,15 @@
     else { input.client = localI; send({ type:"input", v: input.client }); }
   }
 
-  // show mobile pad on touch devices
   if(("ontouchstart" in window) || navigator.maxTouchPoints > 0){
     ui.mobilePad.style.display = "flex";
   }
 
-  // =========================================================
-  // URL hash join convenience
-  // =========================================================
-  // If you open a shared link like #CODE.PEERID, auto-fill room input.
+  // Hash autofill
   (function autoFillFromHash(){
     const h = (location.hash||"").replace("#","").trim();
     if(h && h.includes(".")){
-      ui.room.value = h;
+      ui.room.value = `${location.origin}${location.pathname}#${h}`;
       toast("Link detected. Click Join room.");
     }
   })();
@@ -1374,9 +1652,10 @@
   ui.roomChip.textContent = "room: —";
   ui.peerChip.textContent = "peer: —";
   ui.pingChip.textContent = "ping: —";
+  setParty(false);
+
   ui.nick.value = (localStorage.getItem("aa_nick") || "");
   ui.nick.addEventListener("input", ()=>localStorage.setItem("aa_nick", ui.nick.value.slice(0,16)));
-
   </script>
 </body>
 </html>
