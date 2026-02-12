@@ -1,0 +1,1382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Arcade Arena — Multiplayer</title>
+  <meta name="description" content="Arcade Arena: multiplayer arcade games hosted on GitHub Pages (P2P WebRTC)." />
+  <style>
+    :root{
+      --bg:#070812; --panel:#0f1224; --panel2:#0b0d1a;
+      --txt:#e8ecff; --muted:#a9b0d9;
+      --a:#7c5cff; --b:#00e5ff; --c:#00ff88; --d:#ff4d8d;
+      --bad:#ff5a5a; --ok:#29ff9b;
+      --border: rgba(255,255,255,.08);
+      --shadow: 0 18px 60px rgba(0,0,0,.55);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 700px at 20% 10%, rgba(124,92,255,.25), transparent 60%),
+                  radial-gradient(900px 600px at 90% 30%, rgba(0,229,255,.18), transparent 55%),
+                  radial-gradient(900px 700px at 50% 100%, rgba(0,255,136,.12), transparent 60%),
+                  var(--bg);
+      color:var(--txt);
+      overflow:hidden;
+    }
+    a{color:var(--b)}
+    .wrap{
+      height:100%;
+      display:grid;
+      grid-template-columns: 360px 1fr;
+      gap:14px;
+      padding:14px;
+    }
+    @media (max-width: 980px){
+      body{overflow:auto}
+      .wrap{grid-template-columns: 1fr; overflow:auto}
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+    .side{padding:14px; display:flex; flex-direction:column; gap:12px}
+    .brand{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:12px 12px;
+      background: linear-gradient(90deg, rgba(124,92,255,.22), rgba(0,229,255,.16), rgba(0,255,136,.12));
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .brand h1{font-size:16px; margin:0; letter-spacing:.4px}
+    .pill{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.25);
+      color: var(--muted);
+      white-space:nowrap;
+    }
+    .section{
+      padding:12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.20);
+    }
+    .section h2{margin:0 0 10px; font-size:13px; color:var(--muted); font-weight:700; letter-spacing:.3px}
+    label{font-size:12px; color:var(--muted)}
+    input, select, button, textarea{
+      width:100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(10,12,25,.65);
+      color: var(--txt);
+      padding: 10px 11px;
+      outline:none;
+      font-size: 14px;
+    }
+    input::placeholder, textarea::placeholder{color: rgba(232,236,255,.45)}
+    .row{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
+    .row3{display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px}
+    button{
+      cursor:pointer;
+      background: linear-gradient(180deg, rgba(124,92,255,.9), rgba(124,92,255,.55));
+      border:1px solid rgba(255,255,255,.14);
+      font-weight:800;
+    }
+    button.secondary{
+      background: linear-gradient(180deg, rgba(0,229,255,.75), rgba(0,229,255,.35));
+    }
+    button.ghost{
+      background: rgba(255,255,255,.06);
+    }
+    button.danger{
+      background: linear-gradient(180deg, rgba(255,77,141,.9), rgba(255,77,141,.45));
+    }
+    button:disabled{opacity:.5; cursor:not-allowed}
+    .hint{font-size:12px; color:rgba(232,236,255,.65); line-height:1.35}
+    .kpi{
+      display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+      font-size:12px; color:rgba(232,236,255,.72);
+    }
+    .dot{width:9px; height:9px; border-radius:999px; background: var(--bad); box-shadow:0 0 10px rgba(255,90,90,.5)}
+    .dot.ok{background: var(--ok); box-shadow:0 0 10px rgba(41,255,155,.45)}
+    .games{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    .gameTile{
+      padding:10px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.24);
+      display:flex; flex-direction:column; gap:8px;
+      min-height:120px;
+    }
+    .gameTile strong{font-size:14px}
+    .gameTile small{color:rgba(232,236,255,.65); line-height:1.35}
+    .tag{display:inline-flex; gap:6px; align-items:center; width:max-content}
+    .tag span{
+      font-size:11px; padding:4px 8px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color:rgba(232,236,255,.75);
+    }
+    .main{
+      display:grid;
+      grid-template-rows: auto 1fr auto;
+    }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.18);
+    }
+    .topbar .title{display:flex; flex-direction:column; gap:2px}
+    .topbar h3{margin:0; font-size:14px}
+    .topbar p{margin:0; font-size:12px; color:rgba(232,236,255,.65)}
+    .stage{
+      position:relative;
+      display:grid;
+      place-items:center;
+      background: radial-gradient(700px 450px at 50% 20%, rgba(0,229,255,.10), transparent 60%),
+                  radial-gradient(900px 650px at 50% 80%, rgba(124,92,255,.12), transparent 65%),
+                  rgba(0,0,0,.12);
+    }
+    canvas{
+      width:min(1120px, 96vw);
+      height:auto;
+      border-radius: 18px;
+      border:1px solid rgba(255,255,255,.12);
+      background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.55));
+      box-shadow: 0 18px 70px rgba(0,0,0,.65);
+      image-rendering: crisp-edges;
+    }
+    .bottombar{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      padding:12px 14px;
+      border-top:1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.18);
+      flex-wrap:wrap;
+    }
+    .controls{
+      display:flex; gap:8px; flex-wrap:wrap;
+      align-items:center;
+      font-size:12px;
+      color:rgba(232,236,255,.70);
+    }
+    .chip{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      white-space:nowrap;
+    }
+    .toast{
+      position:absolute;
+      top:14px; left:50%;
+      transform: translateX(-50%);
+      padding:10px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.55);
+      color: rgba(232,236,255,.85);
+      font-size:12px;
+      pointer-events:none;
+      opacity:0;
+      transition: opacity .18s ease;
+    }
+    .toast.show{opacity:1}
+    .chat{
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .chatlog{
+      height:160px;
+      overflow:auto;
+      padding:10px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.25);
+      font-size:12px;
+      color: rgba(232,236,255,.80);
+      line-height:1.35;
+      white-space:pre-wrap;
+    }
+    .chatlog b{color: #fff}
+    .mobilePad{
+      display:none;
+      gap:10px;
+      align-items:center;
+    }
+    @media (max-width: 980px){
+      .mobilePad{display:flex; width:100%}
+      .mobilePad button{width:auto; flex:1; padding:12px}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <aside class="card side">
+      <div class="brand">
+        <div>
+          <h1>🎮 Arcade Arena</h1>
+          <div class="hint">Multiplayer on GitHub Pages (P2P WebRTC)</div>
+        </div>
+        <div class="pill" id="buildTag">v1.0</div>
+      </div>
+
+      <div class="section">
+        <h2>Connection</h2>
+        <div class="kpi" style="margin-bottom:10px">
+          <span class="dot" id="connDot"></span>
+          <span id="connText">offline</span>
+          <span class="pill" id="myIdPill" title="Your Peer ID">id: …</span>
+        </div>
+
+        <div class="row" style="margin-bottom:10px">
+          <div>
+            <label>Nickname</label>
+            <input id="nick" placeholder="e.g. Jay" maxlength="16" />
+          </div>
+          <div>
+            <label>Room code</label>
+            <input id="room" placeholder="e.g. 7K2P9" maxlength="12" />
+          </div>
+        </div>
+
+        <div class="row3">
+          <button id="btnHost">Host room</button>
+          <button class="secondary" id="btnJoin">Join room</button>
+          <button class="danger" id="btnLeave" disabled>Leave</button>
+        </div>
+
+        <p class="hint" style="margin:10px 0 0">
+          Host generates a room code. Share it. Joining connects directly peer-to-peer.
+        </p>
+      </div>
+
+      <div class="section">
+        <h2>Games</h2>
+        <div class="games">
+          <div class="gameTile">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
+              <strong>Neon Pong</strong>
+              <div class="tag"><span>2P</span><span>fast</span></div>
+            </div>
+            <small>Classic Pong, but spicy: dash, curve, and speed ramps.</small>
+            <button class="ghost" data-game="pong" id="pickPong">Play</button>
+          </div>
+          <div class="gameTile">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
+              <strong>Astro Tag</strong>
+              <div class="tag"><span>2P</span><span>chaos</span></div>
+            </div>
+            <small>Top-down tag in a neon arena. Grab the orb, become “it”.</small>
+            <button class="ghost" data-game="tag" id="pickTag">Play</button>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <button class="ghost" id="btnReady">Ready</button>
+          <button class="ghost" id="btnReset">Reset round</button>
+        </div>
+
+        <p class="hint" style="margin:10px 0 0">
+          Controls: <b>W/S</b> or <b>↑/↓</b> in Pong, <b>WASD</b> / <b>Arrows</b> in Tag. Press <b>Space</b> to dash.
+        </p>
+      </div>
+
+      <div class="section chat">
+        <h2>Chat</h2>
+        <div class="chatlog" id="chatlog"></div>
+        <div class="row">
+          <input id="chatin" placeholder="Type… (enter to send)" maxlength="120" />
+          <button class="secondary" id="btnSend">Send</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Tips</h2>
+        <div class="hint">
+          • Best experience: Chrome/Edge on desktop<br/>
+          • If joining fails: both players refresh + try a new room code<br/>
+          • You can fork this and add more games easily (each game is a small module below)
+        </div>
+      </div>
+    </aside>
+
+    <main class="card main">
+      <div class="topbar">
+        <div class="title">
+          <h3 id="gameTitle">Lobby</h3>
+          <p id="gameSubtitle">Host a room or join one. Then pick a game.</p>
+        </div>
+        <div class="kpi">
+          <span class="chip" id="roleChip">role: —</span>
+          <span class="chip" id="roomChip">room: —</span>
+          <span class="chip" id="peerChip">peer: —</span>
+          <span class="chip" id="pingChip">ping: —</span>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="toast" id="toast">Toast</div>
+        <canvas id="cv" width="960" height="540"></canvas>
+      </div>
+
+      <div class="bottombar">
+        <div class="controls" id="controlHelp">
+          <span class="chip">Pick a game on the left</span>
+          <span class="chip">Space = dash</span>
+          <span class="chip">R = ready</span>
+          <span class="chip">Esc = leave room</span>
+        </div>
+
+        <div class="mobilePad" id="mobilePad">
+          <button class="ghost" id="mLeft">◀</button>
+          <button class="ghost" id="mUp">▲</button>
+          <button class="ghost" id="mDown">▼</button>
+          <button class="ghost" id="mRight">▶</button>
+          <button class="secondary" id="mDash">DASH</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- PeerJS (WebRTC) — works from static GitHub Pages -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <script>
+  // =========================================================
+  // Arcade Arena — static multiplayer via PeerJS (WebRTC)
+  // =========================================================
+
+  // ---------- Helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
+  const rand = (a,b) => a + Math.random()*(b-a);
+  const now = () => performance.now();
+
+  function makeCode(len=5){
+    const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    let s="";
+    for(let i=0;i<len;i++) s += chars[(Math.random()*chars.length)|0];
+    return s;
+  }
+
+  function toast(msg){
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._tm);
+    toast._tm = setTimeout(()=>t.classList.remove("show"), 1600);
+  }
+
+  function logChat(line){
+    const el = $("chatlog");
+    el.textContent += (el.textContent ? "\n" : "") + line;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // ---------- UI ----------
+  const ui = {
+    connDot: $("connDot"),
+    connText: $("connText"),
+    myIdPill: $("myIdPill"),
+    nick: $("nick"),
+    room: $("room"),
+    btnHost: $("btnHost"),
+    btnJoin: $("btnJoin"),
+    btnLeave: $("btnLeave"),
+    btnReady: $("btnReady"),
+    btnReset: $("btnReset"),
+    btnSend: $("btnSend"),
+    chatin: $("chatin"),
+    gameTitle: $("gameTitle"),
+    gameSubtitle: $("gameSubtitle"),
+    roleChip: $("roleChip"),
+    roomChip: $("roomChip"),
+    peerChip: $("peerChip"),
+    pingChip: $("pingChip"),
+    pickPong: $("pickPong"),
+    pickTag: $("pickTag"),
+    mobilePad: $("mobilePad")
+  };
+
+  // ---------- Networking model ----------
+  // Host = authoritative simulation, sends state snapshots to client.
+  // Client sends inputs to host.
+  let peer = null;
+  let conn = null;     // DataConnection to other player
+  let role = "none";   // "host" | "client" | "none"
+  let roomCode = "";
+  let myId = "";
+  let peerId = "";
+  let connected = false;
+
+  // Ping
+  let pingMs = null;
+  let pingT0 = 0;
+
+  // Lobby ready flags
+  let ready = { host:false, client:false };
+
+  // Current game selection
+  let currentGame = "lobby"; // "pong" | "tag" | "lobby"
+  let inRound = false;
+
+  // Inputs for both players (host keeps both)
+  const input = {
+    host: { up:false, down:false, left:false, right:false, dash:false },
+    client:{ up:false, down:false, left:false, right:false, dash:false }
+  };
+
+  // ---------- Canvas ----------
+  const cv = $("cv");
+  const ctx = cv.getContext("2d");
+
+  // Background starfield
+  const stars = Array.from({length:140}, ()=>({
+    x: Math.random()*cv.width,
+    y: Math.random()*cv.height,
+    s: rand(0.6,2.2),
+    v: rand(15,55)
+  }));
+
+  function drawBg(dt){
+    // subtle animated gradient wash
+    ctx.save();
+    ctx.clearRect(0,0,cv.width,cv.height);
+
+    // stars
+    ctx.globalAlpha = 0.8;
+    for(const st of stars){
+      st.y += st.v * dt;
+      if(st.y > cv.height+10){ st.y = -10; st.x = Math.random()*cv.width; }
+      ctx.fillRect(st.x, st.y, st.s, st.s);
+    }
+    ctx.restore();
+  }
+
+  // ---------- Sound (tiny, optional) ----------
+  // Minimal oscillator "beeps" so we don't depend on assets.
+  let audioCtx = null;
+  function beep(freq=440, ms=60, gain=0.03){
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      g.gain.value = gain;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      setTimeout(()=>{ o.stop(); }, ms);
+    }catch(e){}
+  }
+
+  // =========================================================
+  // Game: Neon Pong (2P)
+  // =========================================================
+  const Pong = (() => {
+    const W = cv.width, H = cv.height;
+    const state = {
+      ball: { x: W/2, y: H/2, vx: 340, vy: 120, r: 9 },
+      p1: { y: H/2, vy: 0, score: 0, dash: 0 },
+      p2: { y: H/2, vy: 0, score: 0, dash: 0 },
+      speed: 1.0,
+      serveTo: 1,
+      msg: "Press Ready",
+    };
+
+    function resetRound(){
+      state.ball.x = W/2; state.ball.y = H/2;
+      const dir = state.serveTo === 1 ? 1 : -1;
+      state.ball.vx = dir * 340;
+      state.ball.vy = rand(-160,160);
+      state.speed = 1.0;
+      state.msg = "GO!";
+      beep(520,60,0.02);
+    }
+
+    function applyInput(dt, who, inp){
+      // who: 1 (host/p1) or 2 (client/p2)
+      const P = (who === 1) ? state.p1 : state.p2;
+      const base = 420;
+      let v = 0;
+      if(inp.up) v -= base;
+      if(inp.down) v += base;
+
+      // dash: short speed burst (cooldown)
+      if(P.dash > 0) P.dash -= dt;
+      if(inp.dash && P.dash <= 0){
+        P.dash = 1.2;
+        v *= 2.0;
+        beep(760,45,0.02);
+      }
+      P.vy = v;
+      P.y = clamp(P.y + P.vy*dt, 46, H-46);
+    }
+
+    function step(dt){
+      // move ball
+      const b = state.ball;
+      b.x += b.vx * dt * state.speed;
+      b.y += b.vy * dt * state.speed;
+
+      // walls
+      if(b.y < 18){ b.y = 18; b.vy *= -1; beep(620,35,0.015); }
+      if(b.y > H-18){ b.y = H-18; b.vy *= -1; beep(620,35,0.015); }
+
+      // paddles
+      const px = 40, pw = 12, ph = 90;
+      const p1y = state.p1.y, p2y = state.p2.y;
+
+      // left paddle
+      if(b.x - b.r < px+pw && b.x > px){
+        if(Math.abs(b.y - p1y) < ph/2){
+          b.x = px+pw + b.r;
+          b.vx = Math.abs(b.vx) * 1.06;
+          // add curve
+          b.vy += (b.y - p1y) * 6.0;
+          state.speed = clamp(state.speed + 0.02, 1, 1.55);
+          beep(520,40,0.02);
+        }
+      }
+      // right paddle
+      const rx = W - 40 - pw;
+      if(b.x + b.r > rx && b.x < rx+pw){
+        if(Math.abs(b.y - p2y) < ph/2){
+          b.x = rx - b.r;
+          b.vx = -Math.abs(b.vx) * 1.06;
+          b.vy += (b.y - p2y) * 6.0;
+          state.speed = clamp(state.speed + 0.02, 1, 1.55);
+          beep(520,40,0.02);
+        }
+      }
+
+      // scoring
+      if(b.x < -40){
+        state.p2.score++;
+        state.serveTo = 1;
+        state.msg = "Point → Player 2";
+        beep(220,120,0.03);
+        resetRound();
+      }
+      if(b.x > W+40){
+        state.p1.score++;
+        state.serveTo = 2;
+        state.msg = "Point → Player 1";
+        beep(220,120,0.03);
+        resetRound();
+      }
+    }
+
+    function draw(){
+      // neon court
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+
+      // center line
+      ctx.strokeStyle = "rgba(255,255,255,.14)";
+      ctx.setLineDash([10,12]);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(W/2, 40);
+      ctx.lineTo(W/2, H-40);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // glow frame
+      ctx.strokeStyle = "rgba(124,92,255,.22)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(22, 22, W-44, H-44);
+
+      // paddles
+      const pw=12, ph=90, px=40, rx=W-40-pw;
+      ctx.fillStyle = "rgba(0,229,255,.85)";
+      ctx.fillRect(px, state.p1.y - ph/2, pw, ph);
+      ctx.fillStyle = "rgba(0,255,136,.85)";
+      ctx.fillRect(rx, state.p2.y - ph/2, pw, ph);
+
+      // ball
+      ctx.fillStyle = "rgba(255,255,255,.92)";
+      ctx.beginPath();
+      ctx.arc(state.ball.x, state.ball.y, state.ball.r, 0, Math.PI*2);
+      ctx.fill();
+
+      // HUD
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "rgba(232,236,255,.9)";
+      ctx.font = "700 28px ui-sans-serif, system-ui";
+      ctx.fillText(state.p1.score, W/2 - 80, 64);
+      ctx.fillText(state.p2.score, W/2 + 60, 64);
+
+      ctx.font = "600 12px ui-sans-serif, system-ui";
+      ctx.fillStyle = "rgba(232,236,255,.70)";
+      ctx.fillText(state.msg, 36, H-22);
+
+      ctx.restore();
+    }
+
+    function serialize(){
+      return JSON.parse(JSON.stringify(state));
+    }
+    function load(s){
+      Object.assign(state, s);
+    }
+
+    return { state, resetRound, applyInput, step, draw, serialize, load };
+  })();
+
+  // =========================================================
+  // Game: Astro Tag (2P)
+  // =========================================================
+  const Tag = (() => {
+    const W = cv.width, H = cv.height;
+    const state = {
+      p1: { x: W*0.25, y: H*0.5, vx:0, vy:0, score:0, dash:0 },
+      p2: { x: W*0.75, y: H*0.5, vx:0, vy:0, score:0, dash:0 },
+      orb: { x: W/2, y: H/2, t:0 },
+      it: 1, // who is "it"
+      msg: "Press Ready",
+      roundT: 0,
+    };
+
+    const obstacles = [
+      {x: W/2 - 110, y: H/2 - 22, w: 220, h: 44},
+      {x: W/2 - 22, y: H/2 - 150, w: 44,  h: 300},
+    ];
+
+    function resetRound(){
+      state.p1.x = W*0.25; state.p1.y = H*0.5; state.p1.vx=0; state.p1.vy=0; state.p1.dash=0;
+      state.p2.x = W*0.75; state.p2.y = H*0.5; state.p2.vx=0; state.p2.vy=0; state.p2.dash=0;
+      state.orb.x = W/2; state.orb.y = H/2; state.orb.t = 0;
+      state.it = (Math.random()<0.5)?1:2;
+      state.msg = "GO! Grab the orb";
+      state.roundT = 0;
+      beep(620,70,0.02);
+    }
+
+    function pushOutRect(p, r){
+      // simple AABB collision resolution
+      if(p.x > r.x && p.x < r.x+r.w && p.y > r.y && p.y < r.y+r.h){
+        const left = p.x - r.x, right = (r.x+r.w) - p.x;
+        const top = p.y - r.y, bottom = (r.y+r.h) - p.y;
+        const m = Math.min(left,right,top,bottom);
+        if(m === left) p.x = r.x - 0.01;
+        else if(m === right) p.x = r.x+r.w + 0.01;
+        else if(m === top) p.y = r.y - 0.01;
+        else p.y = r.y+r.h + 0.01;
+      }
+    }
+
+    function applyInput(dt, who, inp){
+      const P = who===1 ? state.p1 : state.p2;
+      const base = 300;
+      let ax=0, ay=0;
+      if(inp.left) ax -= 1;
+      if(inp.right) ax += 1;
+      if(inp.up) ay -= 1;
+      if(inp.down) ay += 1;
+
+      const mag = Math.hypot(ax,ay) || 1;
+      ax/=mag; ay/=mag;
+
+      // dash
+      if(P.dash>0) P.dash -= dt;
+      let sp = base;
+      if(inp.dash && P.dash<=0){
+        P.dash = 1.1;
+        sp = 560;
+        beep(760,45,0.02);
+      }
+
+      P.vx = ax * sp;
+      P.vy = ay * sp;
+
+      P.x = clamp(P.x + P.vx*dt, 26, W-26);
+      P.y = clamp(P.y + P.vy*dt, 26, H-26);
+
+      for(const r of obstacles) pushOutRect(P, r);
+    }
+
+    function step(dt){
+      state.roundT += dt;
+
+      // orb drift
+      state.orb.t += dt;
+      state.orb.x = W/2 + Math.cos(state.orb.t*1.2)*140;
+      state.orb.y = H/2 + Math.sin(state.orb.t*1.6)*90;
+
+      const p1 = state.p1, p2 = state.p2, o = state.orb;
+
+      // pick orb: if you're "it" and touch orb, you score slowly over time
+      // also, touching opponent tags them (swap 'it')
+      const d12 = Math.hypot(p1.x-p2.x, p1.y-p2.y);
+      if(d12 < 28){
+        state.it = (state.it===1)?2:1;
+        state.msg = `TAG! Player ${state.it} is IT`;
+        beep(520,60,0.02);
+      }
+
+      // scoring while holding orb as IT
+      const itP = state.it===1 ? p1 : p2;
+      const dOrb = Math.hypot(itP.x - o.x, itP.y - o.y);
+      if(dOrb < 22){
+        if(state.it===1) state.p1.score += dt*10;
+        else state.p2.score += dt*10;
+        if(Math.random() < 0.04) beep(980,25,0.01);
+      }
+
+      // win condition
+      if(state.p1.score >= 100 || state.p2.score >= 100){
+        const w = state.p1.score >= 100 ? 1 : 2;
+        state.msg = `WINNER: Player ${w}  (Reset round)`;
+        inRound = false;
+        beep(220,180,0.04);
+      }
+    }
+
+    function draw(){
+      ctx.save();
+      ctx.globalAlpha = 0.95;
+
+      // arena border
+      ctx.strokeStyle = "rgba(0,229,255,.18)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(18,18, W-36, H-36);
+
+      // obstacles
+      ctx.fillStyle = "rgba(255,255,255,.07)";
+      for(const r of obstacles) ctx.fillRect(r.x, r.y, r.w, r.h);
+
+      // orb
+      ctx.fillStyle = "rgba(255,77,141,.85)";
+      ctx.beginPath();
+      ctx.arc(state.orb.x, state.orb.y, 10, 0, Math.PI*2);
+      ctx.fill();
+
+      // players
+      function drawP(P, color, isIt){
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(P.x, P.y, 14, 0, Math.PI*2);
+        ctx.fill();
+        if(isIt){
+          ctx.strokeStyle = "rgba(255,255,255,.85)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(P.x, P.y, 19, 0, Math.PI*2);
+          ctx.stroke();
+        }
+      }
+      drawP(state.p1, "rgba(0,229,255,.85)", state.it===1);
+      drawP(state.p2, "rgba(0,255,136,.85)", state.it===2);
+
+      // HUD
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "rgba(232,236,255,.9)";
+      ctx.font = "700 18px ui-sans-serif, system-ui";
+      ctx.fillText(`P1: ${Math.floor(state.p1.score)}`, 26, 44);
+      ctx.fillText(`P2: ${Math.floor(state.p2.score)}`, W-140, 44);
+
+      ctx.font = "600 12px ui-sans-serif, system-ui";
+      ctx.fillStyle = "rgba(232,236,255,.70)";
+      ctx.fillText(state.msg, 26, H-22);
+
+      ctx.restore();
+    }
+
+    function serialize(){ return JSON.parse(JSON.stringify(state)); }
+    function load(s){ Object.assign(state, s); }
+
+    return { state, resetRound, applyInput, step, draw, serialize, load };
+  })();
+
+  // =========================================================
+  // Game Loop + State Sync
+  // =========================================================
+  let lastT = now();
+  function loop(){
+    const t = now();
+    let dt = (t - lastT) / 1000;
+    lastT = t;
+    dt = clamp(dt, 0, 1/20);
+
+    drawBg(dt);
+
+    if(currentGame === "lobby"){
+      drawLobby(dt);
+    }else{
+      // If in room: host simulates and sends state; client just renders received state
+      if(role === "host" && connected && inRound){
+        if(currentGame === "pong"){
+          Pong.applyInput(dt, 1, input.host);
+          Pong.applyInput(dt, 2, input.client);
+          Pong.step(dt);
+        }else if(currentGame === "tag"){
+          Tag.applyInput(dt, 1, input.host);
+          Tag.applyInput(dt, 2, input.client);
+          Tag.step(dt);
+        }
+        // send snapshot ~30Hz
+        sendStateMaybe(t);
+      }
+
+      // Draw current game from local state (host = live, client = last received)
+      if(currentGame === "pong") Pong.draw();
+      if(currentGame === "tag") Tag.draw();
+
+      // overlay if not inRound
+      if(!inRound){
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,.45)";
+        ctx.fillRect(0,0,cv.width,cv.height);
+        ctx.fillStyle = "rgba(232,236,255,.92)";
+        ctx.font = "800 28px ui-sans-serif, system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText("READY UP", cv.width/2, cv.height/2 - 10);
+        ctx.font = "600 14px ui-sans-serif, system-ui";
+        ctx.fillStyle = "rgba(232,236,255,.75)";
+        ctx.fillText("Click Ready (or press R). Both players must be ready.", cv.width/2, cv.height/2 + 18);
+        ctx.restore();
+      }
+    }
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function drawLobby(dt){
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(232,236,255,.9)";
+    ctx.font = "900 40px ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("ARCADE ARENA", cv.width/2, 170);
+
+    ctx.font = "600 16px ui-sans-serif, system-ui";
+    ctx.fillStyle = "rgba(232,236,255,.70)";
+    ctx.fillText("Host a room or join one. Then pick a game.", cv.width/2, 205);
+
+    // animated ring
+    const k = (now()/1000);
+    ctx.strokeStyle = "rgba(124,92,255,.35)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cv.width/2, 300, 90 + Math.sin(k*1.2)*6, 0, Math.PI*2);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(0,229,255,.28)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cv.width/2, 300, 118 + Math.cos(k*1.1)*6, 0, Math.PI*2);
+    ctx.stroke();
+
+    ctx.font = "700 13px ui-sans-serif, system-ui";
+    ctx.fillStyle = "rgba(232,236,255,.65)";
+    ctx.fillText("Tip: Share the room code. If you’re host, you’re Player 1.", cv.width/2, 430);
+
+    ctx.restore();
+  }
+
+  // Host sends snapshots at 30Hz
+  let lastSend = 0;
+  function sendStateMaybe(tMs){
+    if(!conn || !conn.open) return;
+    if(tMs - lastSend < 33) return;
+    lastSend = tMs;
+
+    const payload = {
+      type:"state",
+      game: currentGame,
+      inRound,
+      ready,
+      t: Date.now(),
+      s: currentGame==="pong" ? Pong.serialize() : Tag.serialize()
+    };
+    conn.send(payload);
+  }
+
+  function setGame(game){
+    currentGame = game;
+    inRound = false;
+    ready.host = false; ready.client = false;
+
+    if(game === "lobby"){
+      ui.gameTitle.textContent = "Lobby";
+      ui.gameSubtitle.textContent = "Host a room or join one. Then pick a game.";
+      return;
+    }
+
+    if(game === "pong"){
+      ui.gameTitle.textContent = "Neon Pong";
+      ui.gameSubtitle.textContent = "Dash (Space). Curve by hitting off-center.";
+      Pong.state.msg = "Press Ready";
+    }
+    if(game === "tag"){
+      ui.gameTitle.textContent = "Astro Tag";
+      ui.gameSubtitle.textContent = "Be IT, touch orb to score. Touch opponent to tag.";
+      Tag.state.msg = "Press Ready";
+    }
+
+    // inform peer
+    send({ type:"pick", game });
+  }
+
+  function startRoundIfReady(){
+    if(!(ready.host && ready.client)) return;
+    inRound = true;
+    if(role === "host"){
+      if(currentGame === "pong") Pong.resetRound();
+      if(currentGame === "tag") Tag.resetRound();
+      send({ type:"round", action:"start", game: currentGame });
+    }
+  }
+
+  function resetRound(){
+    inRound = false;
+    ready.host = false; ready.client = false;
+    if(role === "host"){
+      if(currentGame === "pong") Pong.resetRound();
+      if(currentGame === "tag") Tag.resetRound();
+      send({ type:"round", action:"reset", game: currentGame });
+    }else{
+      send({ type:"round", action:"reset_req", game: currentGame });
+    }
+  }
+
+  // =========================================================
+  // PeerJS setup
+  // =========================================================
+  function initPeer(){
+    if(peer) { try{ peer.destroy(); }catch(e){} }
+    peer = new Peer(undefined, {
+      debug: 0,
+      // PeerJS Cloud defaults are fine for a fun project
+    });
+
+    peer.on("open", id => {
+      myId = id;
+      ui.myIdPill.textContent = `id: ${id.slice(0,6)}…`;
+      ui.connText.textContent = "online (not in room)";
+      ui.connDot.classList.add("ok");
+    });
+
+    peer.on("connection", c => {
+      // incoming connection: we become host
+      if(conn && conn.open){
+        c.close();
+        return;
+      }
+      role = "host";
+      attachConn(c);
+      toast("Player joined your room!");
+      logChat("• System: player joined.");
+    });
+
+    peer.on("disconnected", () => {
+      ui.connText.textContent = "offline";
+      ui.connDot.classList.remove("ok");
+    });
+
+    peer.on("error", err => {
+      console.warn(err);
+      toast("Network error. Refresh and try again.");
+    });
+  }
+
+  initPeer();
+
+  function attachConn(c){
+    conn = c;
+    connected = true;
+    peerId = c.peer;
+
+    ui.btnLeave.disabled = false;
+    ui.btnHost.disabled = true;
+    ui.btnJoin.disabled = true;
+
+    ui.roleChip.textContent = `role: ${role}`;
+    ui.roomChip.textContent = `room: ${roomCode || "—"}`;
+    ui.peerChip.textContent = `peer: ${peerId.slice(0,6)}…`;
+    ui.connText.textContent = "connected";
+    ui.connDot.classList.add("ok");
+
+    // send hello
+    send({ type:"hello", nick: ui.nick.value || "Player", room: roomCode });
+
+    c.on("data", onData);
+    c.on("open", () => {
+      // ping loop
+      pingLoop();
+      toast("Connected!");
+      beep(660,70,0.02);
+    });
+    c.on("close", () => {
+      onLeaveCleanup();
+      toast("Peer disconnected");
+    });
+    c.on("error", () => {
+      onLeaveCleanup();
+      toast("Peer connection error");
+    });
+  }
+
+  function onLeaveCleanup(){
+    connected = false;
+    peerId = "";
+    roomCode = "";
+    role = "none";
+    conn = null;
+
+    ui.btnLeave.disabled = true;
+    ui.btnHost.disabled = false;
+    ui.btnJoin.disabled = false;
+
+    ui.roleChip.textContent = "role: —";
+    ui.roomChip.textContent = "room: —";
+    ui.peerChip.textContent = "peer: —";
+    ui.pingChip.textContent = "ping: —";
+
+    ready.host=false; ready.client=false;
+    inRound=false;
+    setGame("lobby");
+    logChat("• System: disconnected.");
+  }
+
+  function send(obj){
+    if(conn && conn.open){
+      conn.send(obj);
+    }
+  }
+
+  function onData(msg){
+    if(!msg || typeof msg !== "object") return;
+
+    if(msg.type === "hello"){
+      logChat(`• System: connected with ${msg.nick || "Player"}`);
+      if(role === "host"){
+        // tell client current game selection
+        send({ type:"pick", game: currentGame });
+        send({ type:"ready", who:"host", v: ready.host });
+      }
+      return;
+    }
+
+    if(msg.type === "chat"){
+      logChat(`• ${msg.nick || "Player"}: ${msg.text}`);
+      return;
+    }
+
+    if(msg.type === "pick"){
+      // host decides game, but if host changes it, client follows
+      currentGame = msg.game;
+      ready.host=false; ready.client=false; inRound=false;
+      if(currentGame==="pong"){
+        ui.gameTitle.textContent="Neon Pong";
+        ui.gameSubtitle.textContent="Dash (Space). Curve by hitting off-center.";
+      }else if(currentGame==="tag"){
+        ui.gameTitle.textContent="Astro Tag";
+        ui.gameSubtitle.textContent="Be IT, touch orb to score. Touch opponent to tag.";
+      }else{
+        ui.gameTitle.textContent="Lobby";
+        ui.gameSubtitle.textContent="Host a room or join one. Then pick a game.";
+      }
+      toast(`Game set: ${currentGame}`);
+      return;
+    }
+
+    if(msg.type === "ready"){
+      if(msg.who === "host") ready.host = !!msg.v;
+      if(msg.who === "client") ready.client = !!msg.v;
+      if(role === "host") startRoundIfReady();
+      return;
+    }
+
+    if(msg.type === "round"){
+      if(msg.action === "start"){
+        inRound = true;
+        toast("Round started!");
+      }
+      if(msg.action === "reset"){
+        inRound = false;
+        ready.host=false; ready.client=false;
+        toast("Round reset");
+      }
+      if(msg.action === "reset_req"){
+        if(role === "host") resetRound();
+      }
+      return;
+    }
+
+    if(msg.type === "input"){
+      // host receives client input
+      if(role === "host"){
+        input.client = msg.v;
+      }
+      return;
+    }
+
+    if(msg.type === "state"){
+      // client receives authoritative state
+      if(role === "client"){
+        currentGame = msg.game;
+        inRound = !!msg.inRound;
+        ready = msg.ready || ready;
+        if(currentGame === "pong") Pong.load(msg.s);
+        if(currentGame === "tag") Tag.load(msg.s);
+      }
+      return;
+    }
+
+    if(msg.type === "ping"){
+      send({ type:"pong", t: msg.t });
+      return;
+    }
+    if(msg.type === "pong"){
+      const rtt = Date.now() - msg.t;
+      pingMs = rtt;
+      ui.pingChip.textContent = `ping: ${rtt}ms`;
+      return;
+    }
+  }
+
+  function pingLoop(){
+    if(!connected) return;
+    send({ type:"ping", t: Date.now() });
+    setTimeout(pingLoop, 1200);
+  }
+
+  // =========================================================
+  // UI Actions
+  // =========================================================
+  ui.btnHost.onclick = () => {
+    if(!peer || !myId){
+      toast("Still connecting… try again in a second.");
+      return;
+    }
+    role = "host";
+    roomCode = makeCode(5);
+    ui.room.value = roomCode;
+    ui.roomChip.textContent = `room: ${roomCode}`;
+    ui.roleChip.textContent = "role: host";
+    toast(`Room code: ${roomCode}`);
+    logChat(`• System: hosting room ${roomCode}. Share it with your friend.`);
+    // Note: with PeerJS cloud, "room code" is just a human label.
+    // We'll connect using the host's Peer ID (myId) which host shares implicitly via room code.
+    // For simplicity: we derive "connect target" by asking host to send their Peer ID to friend.
+    // BUT we want room codes only. So we encode host Peer ID into the room field via "CODE@ID" behind the scenes.
+    // We'll show code only, but store mapping in URL hash for easy sharing.
+    const share = `${location.origin}${location.pathname}#${roomCode}.${myId}`;
+    toast("Share the link in the address bar (it contains the room info).");
+    history.replaceState(null,"",share);
+    ui.gameTitle.textContent = "Lobby";
+    ui.gameSubtitle.textContent = "Waiting for a player… (Share the link / code)";
+    ui.btnLeave.disabled = false;
+  };
+
+  ui.btnJoin.onclick = () => {
+    if(!peer || !myId){
+      toast("Still connecting… try again in a second.");
+      return;
+    }
+    // Join using either:
+    // 1) URL hash "CODE.PEERID"
+    // 2) if user pasted "CODE.PEERID" in room field
+    // 3) fallback: ask them to paste the full link (still works)
+    const raw = (ui.room.value || "").trim();
+    const hash = (location.hash || "").replace("#","").trim();
+    const token = raw.includes(".") ? raw : (hash.includes(".") ? hash : "");
+    if(!token){
+      toast("Paste the host link (preferred) or room token CODE.PEERID");
+      return;
+    }
+    const parts = token.split(".");
+    roomCode = parts[0];
+    const target = parts.slice(1).join(".");
+    role = "client";
+
+    ui.roleChip.textContent = "role: client";
+    ui.roomChip.textContent = `room: ${roomCode}`;
+    ui.peerChip.textContent = `peer: ${target.slice(0,6)}…`;
+
+    const c = peer.connect(target, { reliable: true });
+    attachConn(c);
+    toast("Joining…");
+  };
+
+  ui.btnLeave.onclick = () => {
+    if(conn){ try{ conn.close(); }catch(e){} }
+    onLeaveCleanup();
+  };
+
+  ui.btnSend.onclick = sendChat;
+  ui.chatin.addEventListener("keydown", (e) => {
+    if(e.key === "Enter") sendChat();
+  });
+
+  function sendChat(){
+    const text = ui.chatin.value.trim();
+    if(!text) return;
+    ui.chatin.value = "";
+    const nick = (ui.nick.value || "Me").slice(0,16);
+    logChat(`• ${nick}: ${text}`);
+    send({ type:"chat", nick, text });
+  }
+
+  ui.pickPong.onclick = () => {
+    if(role !== "host" && connected){
+      toast("Only host can change game.");
+      return;
+    }
+    setGame("pong");
+  };
+  ui.pickTag.onclick = () => {
+    if(role !== "host" && connected){
+      toast("Only host can change game.");
+      return;
+    }
+    setGame("tag");
+  };
+
+  ui.btnReady.onclick = () => {
+    if(!connected){
+      toast("Connect to a room first.");
+      return;
+    }
+    if(role === "host"){
+      ready.host = !ready.host;
+      send({ type:"ready", who:"host", v: ready.host });
+      toast(ready.host ? "Host ready!" : "Host not ready");
+      startRoundIfReady();
+    }else if(role === "client"){
+      ready.client = !ready.client;
+      send({ type:"ready", who:"client", v: ready.client });
+      toast(ready.client ? "Client ready!" : "Client not ready");
+    }
+  };
+
+  ui.btnReset.onclick = () => {
+    if(!connected){ toast("Connect first."); return; }
+    resetRound();
+  };
+
+  // =========================================================
+  // Input handling
+  // =========================================================
+  const key = {};
+  window.addEventListener("keydown", (e) => {
+    if(e.key === "Escape" && connected) ui.btnLeave.click();
+    if(e.key.toLowerCase() === "r" && connected) ui.btnReady.click();
+    key[e.key.toLowerCase()] = true;
+    updateInputsFromKeys();
+  });
+  window.addEventListener("keyup", (e) => {
+    key[e.key.toLowerCase()] = false;
+    updateInputsFromKeys();
+  });
+
+  function updateInputsFromKeys(){
+    const dash = !!key[" "] || !!key["space"];
+    const hostI = {
+      up: !!key["w"] || !!key["arrowup"],
+      down: !!key["s"] || !!key["arrowdown"],
+      left: !!key["a"] || !!key["arrowleft"],
+      right: !!key["d"] || !!key["arrowright"],
+      dash
+    };
+
+    // For simplicity: both players can use same keyboard in offline mode,
+    // but in online mode we treat local as "host" if host, "client" if client.
+    if(!connected){
+      // local demo in lobby is fine
+      input.host = hostI;
+      input.client = {
+        up: !!key["i"],
+        down: !!key["k"],
+        left: !!key["j"],
+        right: !!key["l"],
+        dash: !!key["shift"]
+      };
+      return;
+    }
+
+    if(role === "host"){
+      input.host = hostI;
+    }else{
+      input.client = hostI;
+      send({ type:"input", v: input.client });
+    }
+  }
+
+  // Mobile buttons
+  function bindHold(btn, onDown, onUp){
+    let held=false;
+    const down = (e)=>{ e.preventDefault(); held=true; onDown(); };
+    const up = (e)=>{ e.preventDefault(); held=false; onUp(); };
+    btn.addEventListener("touchstart", down, {passive:false});
+    btn.addEventListener("mousedown", down);
+    window.addEventListener("touchend", up, {passive:false});
+    window.addEventListener("mouseup", up);
+  }
+
+  const m = {
+    left: $("mLeft"), right:$("mRight"), up:$("mUp"), down:$("mDown"), dash:$("mDash")
+  };
+  const mState = {left:false,right:false,up:false,down:false,dash:false};
+  bindHold(m.left, ()=>{mState.left=true; pushMobile();}, ()=>{mState.left=false; pushMobile();});
+  bindHold(m.right,()=>{mState.right=true;pushMobile();},()=>{mState.right=false;pushMobile();});
+  bindHold(m.up,   ()=>{mState.up=true;   pushMobile();},()=>{mState.up=false;   pushMobile();});
+  bindHold(m.down, ()=>{mState.down=true; pushMobile();},()=>{mState.down=false; pushMobile();});
+  bindHold(m.dash, ()=>{mState.dash=true; pushMobile();},()=>{mState.dash=false; pushMobile();});
+
+  function pushMobile(){
+    if(!connected) return;
+    const localI = {...mState};
+    if(role === "host") input.host = localI;
+    else { input.client = localI; send({ type:"input", v: input.client }); }
+  }
+
+  // show mobile pad on touch devices
+  if(("ontouchstart" in window) || navigator.maxTouchPoints > 0){
+    ui.mobilePad.style.display = "flex";
+  }
+
+  // =========================================================
+  // URL hash join convenience
+  // =========================================================
+  // If you open a shared link like #CODE.PEERID, auto-fill room input.
+  (function autoFillFromHash(){
+    const h = (location.hash||"").replace("#","").trim();
+    if(h && h.includes(".")){
+      ui.room.value = h;
+      toast("Link detected. Click Join room.");
+    }
+  })();
+
+  // initial UI state
+  ui.roleChip.textContent = "role: —";
+  ui.roomChip.textContent = "room: —";
+  ui.peerChip.textContent = "peer: —";
+  ui.pingChip.textContent = "ping: —";
+  ui.nick.value = (localStorage.getItem("aa_nick") || "");
+  ui.nick.addEventListener("input", ()=>localStorage.setItem("aa_nick", ui.nick.value.slice(0,16)));
+
+  </script>
+</body>
+</html>
