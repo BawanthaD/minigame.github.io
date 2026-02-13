@@ -1247,38 +1247,55 @@
 
   initPeer();
 
-  function attachConn(c){
-    conn = c;
-    connected = true;
-    peerId = c.peer;
+function attachConn(c){
+  conn = c;
+  connected = true;
+  peerId = c.peer;
 
-    ui.btnLeave.disabled = false;
-    ui.btnHost.disabled = true;
-    ui.btnJoin.disabled = true;
+  ui.btnLeave.disabled = false;
+  ui.btnHost.disabled = true;
+  ui.btnJoin.disabled = true;
 
-    ui.roleChip.textContent = `role: ${role}`;
-    ui.roomChip.textContent = `room: ${roomCode || "—"}`;
-    ui.peerChip.textContent = `peer: ${peerId.slice(0,6)}…`;
+  ui.roleChip.textContent = `role: ${role}`;
+  ui.roomChip.textContent = `room: ${roomCode || "—"}`;
+  ui.peerChip.textContent = `peer: ${peerId.slice(0,6)}…`;
+  ui.connText.textContent = "connecting…";
+  ui.connDot.classList.add("ok");
+
+  // IMPORTANT: register handlers first
+  c.on("data", onData);
+
+  c.on("open", () => {
     ui.connText.textContent = "connected";
-    ui.connDot.classList.add("ok");
+    toast("Connected!");
+    beep(660,70,0.02);
 
-    send({ type:"hello", nick: ui.nick.value || "Player", room: roomCode, partyMode });
+    // ✅ Send hello ONLY after open
+    const nick = ui.nick.value || "Player";
+    c.send({ type:"hello", nick, room: roomCode, partyMode });
 
-    c.on("data", onData);
-    c.on("open", () => {
-      pingLoop();
-      toast("Connected!");
-      beep(660,70,0.02);
-    });
-    c.on("close", () => {
-      onLeaveCleanup();
-      toast("Peer disconnected");
-    });
-    c.on("error", () => {
-      onLeaveCleanup();
-      toast("Peer connection error");
-    });
-  }
+    // ✅ If host, push current lobby state to client
+    if(role === "host"){
+      c.send({ type:"party", v: partyMode });
+      c.send({ type:"pick", game: currentGame });
+      c.send({ type:"ready", who:"host", v: ready.host });
+    }
+
+    pingLoop();
+  });
+
+  c.on("close", () => {
+    onLeaveCleanup();
+    toast("Peer disconnected");
+  });
+
+  c.on("error", (e) => {
+    console.warn("Conn error:", e);
+    onLeaveCleanup();
+    toast("Peer connection error");
+  });
+}
+
 
   function onLeaveCleanup(){
     connected = false;
@@ -1417,6 +1434,15 @@
       ui.pingChip.textContent = `ping: ${rtt}ms`;
       return;
     }
+    if(msg.type === "sync_req"){
+      if(role === "host" && conn && conn.open){
+        conn.send({ type:"party", v: partyMode });
+        conn.send({ type:"pick", game: currentGame });
+        conn.send({ type:"ready", who:"host", v: ready.host });
+        conn.send({ type:"ready", who:"client", v: ready.client });
+      }
+      return;
+    }
   }
 
   function pingLoop(){
@@ -1522,21 +1548,22 @@
   ui.pickRace.onclick = () => { if(hostOnlyGuard()) setGame("race"); };
 
   ui.btnReady.onclick = () => {
-    if(!connected){
-      toast("Connect to a room first.");
-      return;
-    }
+    if(!connected){ toast("Connect to a room first."); return; }
+
     if(role === "host"){
       ready.host = !ready.host;
       send({ type:"ready", who:"host", v: ready.host });
+      send({ type:"sync_req" });
       toast(ready.host ? "Host ready!" : "Host not ready");
       startRoundIfReady();
-    }else if(role === "client"){
+    }else{
       ready.client = !ready.client;
       send({ type:"ready", who:"client", v: ready.client });
+      send({ type:"sync_req" });
       toast(ready.client ? "Client ready!" : "Client not ready");
     }
   };
+
 
   ui.btnReset.onclick = () => {
     if(!connected){ toast("Connect first."); return; }
